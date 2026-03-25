@@ -41,9 +41,11 @@ whisper_model = whisper.load_model("base")
 # Initialize OpenAI client
 client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-# Create temp directories
-UPLOAD_DIR = Path("backend/temp/uploads")
-OUTPUT_DIR = Path("backend/temp/outputs")
+# Create temp directories relative to this file so the server can be launched
+# from any working directory (e.g. `uvicorn backend.main:app` from the project root).
+_BASE_DIR = Path(__file__).parent
+UPLOAD_DIR = _BASE_DIR / "temp" / "uploads"
+OUTPUT_DIR = _BASE_DIR / "temp" / "outputs"
 UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
 

@@ -1,101 +1,48 @@
-# Voice-to-Slide Generator - Backend
+# Backend — Voice-to-Slide Generator
 
-FastAPI backend for the Voice-to-Slide Generator application.
+FastAPI service that handles video upload, audio extraction, Whisper transcription, GPT slide structuring, and PowerPoint generation.
 
-## Quick Start
+## Quick start
 
 ```bash
+python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
-cp .env.example .env
-# Add your OpenAI API key to .env
+cp .env.example .env          # add your OPENAI_API_KEY
 uvicorn main:app --reload
 ```
 
-API will be available at `http://localhost:8000`
+API: `http://localhost:8000` | Docs: `http://localhost:8000/docs`
 
-## Features
+## Endpoints
 
-- **File Upload**: Accepts MP4 video files
-- **Audio Extraction**: Uses moviepy to extract audio from video
-- **Speech-to-Text**: OpenAI Whisper for transcription
-- **AI Slide Generation**: OpenAI GPT for structured content
-- **PowerPoint Creation**: python-pptx for .pptx file generation
-- **Job Tracking**: In-memory job status management
-- **CORS Support**: Configured for localhost:3000
+| Method | Path | Description |
+|---|---|---|
+| `POST` | `/upload` | Accept MP4; return `job_id` |
+| `GET` | `/status/{job_id}` | Poll status + progress (0–100) |
+| `GET` | `/transcript/{job_id}` | Extract audio + transcribe; return text |
+| `GET` | `/themes` | Available themes with hex colors |
+| `POST` | `/generate-slides/{job_id}?theme=<id>` | GPT outline → build `.pptx` |
+| `GET` | `/download/{job_id}` | Stream finished `.pptx` |
 
-## API Endpoints
-
-### `POST /upload`
-Upload MP4 file and get job ID
-- **Input**: MP4 file (multipart/form-data)
-- **Output**: `{"job_id": "uuid", "message": "success"}`
-
-### `GET /status/{job_id}`
-Check processing status
-- **Output**: `{"status": "...", "progress": 0-100, ...}`
-
-### `GET /transcript/{job_id}`
-Get or generate transcript
-- **Output**: `{"transcript": "..."}`
-
-### `POST /generate-slides/{job_id}`
-Generate PowerPoint slides
-- **Output**: `{"message": "success", "slide_content": {...}}`
-
-### `GET /download/{job_id}`
-Download generated PowerPoint file
-- **Output**: Binary .pptx file
-
-## Processing Pipeline
-
-1. **Upload**: Store MP4 file in `temp/uploads/`
-2. **Audio Extraction**: Use moviepy to extract audio as WAV
-3. **Transcription**: Process audio with Whisper model
-4. **Slide Generation**: Send transcript to OpenAI GPT
-5. **PowerPoint Creation**: Generate .pptx with python-pptx
-6. **Download**: Serve file from `temp/outputs/`
-
-## Configuration
-
-### Environment Variables
-
-Create `.env` file with:
-```
-OPENAI_API_KEY=your_openai_api_key_here
-```
-
-### Dependencies
-
-- **FastAPI**: Web framework
-- **Whisper**: Speech-to-text (local model)
-- **OpenAI**: GPT API for slide generation
-- **python-pptx**: PowerPoint file creation
-- **moviepy**: Video/audio processing
-- **uvicorn**: ASGI server
-
-## Job Status Flow
+## Job lifecycle
 
 ```
-uploaded → extracting_audio → transcribing → transcript_ready → generating_slides → creating_powerpoint → completed
+uploaded → extracting_audio → transcribing → transcript_ready
+         → generating_slides → creating_powerpoint → completed
 ```
 
-## File Storage
+## Environment variables
 
-- **Uploads**: `backend/temp/uploads/{job_id}.mp4`
-- **Audio**: `backend/temp/uploads/{job_id}.wav`
-- **Output**: `backend/temp/outputs/{job_id}.pptx`
+| Variable | Required | Description |
+|---|---|---|
+| `OPENAI_API_KEY` | Yes | Used for GPT slide generation only |
 
-## Error Handling
+Whisper runs fully locally — no audio is sent to any external service.
 
-- File validation (MP4 only)
-- API error responses
-- Job status error tracking
-- Console logging for debugging
+## File storage
 
-## Development Notes
+Temporary files are written under `backend/temp/` (git-ignored):
 
-- **Local Only**: Designed for localhost development
-- **No Authentication**: Simple local API
-- **In-Memory Jobs**: No persistent storage
-- **Console Logging**: Debug output enabled
-- **CORS**: Configured for React frontend
+- `temp/uploads/{job_id}.mp4` — original video
+- `temp/uploads/{job_id}.wav` — extracted audio
+- `temp/outputs/{job_id}.pptx` — generated presentation

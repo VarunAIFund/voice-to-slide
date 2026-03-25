@@ -231,7 +231,7 @@ function App() {
               ></div>
             </div>
             <p className="text-sm text-gray-600 mt-2 capitalize">
-              {status.replace('_', ' ')}
+              {status.replace(/_/g, ' ')}
               {uploading && '...'}
             </p>
           </div>

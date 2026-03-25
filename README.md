@@ -1,247 +1,241 @@
 # Voice-to-Slide Generator
 
-A local development application that converts MP4 video files into PowerPoint presentations using speech-to-text transcription and AI-powered slide generation.
+[![Python](https://img.shields.io/badge/Python-3.8%2B-3776AB?logo=python&logoColor=white)](https://python.org)
+[![FastAPI](https://img.shields.io/badge/FastAPI-0.104-009688?logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com)
+[![React](https://img.shields.io/badge/React-18-61DAFB?logo=react&logoColor=black)](https://reactjs.org)
+[![OpenAI](https://img.shields.io/badge/OpenAI-Whisper%20%2B%20GPT-412991?logo=openai&logoColor=white)](https://openai.com)
+[![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
+
+**Drop in an MP4 video, get back a professionally designed PowerPoint — automatically.**
+
+Voice-to-Slide extracts audio from any MP4 recording, transcribes it with OpenAI Whisper running locally, and uses GPT to structure the content into a polished multi-slide presentation with your choice of four professional color themes.
+
+---
+
+## How It Works
+
+```
+MP4 Video  ──►  Audio (WAV)  ──►  Transcript  ──►  Slide Outline  ──►  .pptx Download
+           moviepy          Whisper (local)    GPT-3.5-turbo      python-pptx
+```
+
+1. **Upload** — drag-and-drop an MP4 file via the React frontend
+2. **Extract** — moviepy strips the audio track to a WAV file
+3. **Transcribe** — Whisper runs the model locally (no audio sent to the cloud)
+4. **Structure** — GPT organizes the transcript into 5–8 titled slides with bullet points
+5. **Design** — python-pptx renders the deck with your chosen theme, typography, slide numbers, and decorative elements
+6. **Download** — the finished `.pptx` lands in your browser
+
+---
 
 ## Features
 
-### Core Functionality
-- **Upload MP4 Videos**: Drag & drop interface for video file uploads
-- **Audio Extraction**: Automatically extracts audio from video files
-- **Speech-to-Text**: Uses OpenAI Whisper for accurate transcription
-- **AI Slide Generation**: OpenAI GPT generates structured slide content
-- **PowerPoint Export**: Creates downloadable .pptx files
-- **Real-time Progress**: Live tracking of processing stages
-- **Transcript Preview**: Review transcript before slide generation
+### Core Pipeline
+- Drag-and-drop MP4 upload with real-time progress tracking
+- Local Whisper transcription — audio stays on your machine
+- GPT-powered slide outlining with clean JSON output
+- One-click `.pptx` download
 
-### Professional Design System
-- **4 Professional Themes**: Corporate Blue, Modern Green, Elegant Purple, Professional Gray
-- **Visual Theme Selection**: Interactive theme picker with color previews
-- **Enhanced Typography**: Professional fonts (Calibri), proper hierarchy, and spacing
-- **Slide Numbers & Footers**: Page numbers and presentation titles on every slide
-- **Decorative Elements**: Accent lines, shapes, and visual polish
-- **Better Formatting**: Improved bullet points, consistent spacing, and alignment
-- **Theme-Based Styling**: Consistent colors, backgrounds, and visual elements
+### Professional Slide Design
 
-## Tech Stack
+Four fully styled themes ship out of the box:
 
-### Frontend
-- React 18 with Vite
-- Tailwind CSS for styling
-- React Dropzone for file uploads
-- Axios for API communication
+| Theme | Primary | Accent | Best For |
+|---|---|---|---|
+| **Corporate Blue** | `#1976D2` | Teal `#009688` | Business meetings, reports |
+| **Modern Green** | `#4CAF50` | Orange `#FF9800` | Tech talks, startups |
+| **Elegant Purple** | `#9C27B0` | Gold `#FFC107` | Creative reviews, design |
+| **Professional Gray** | `#607D8B` | Orange `#FF5722` | Academic, research |
 
-### Backend
-- FastAPI (Python)
-- OpenAI Whisper (local installation)
-- OpenAI GPT API
-- python-pptx for PowerPoint generation
-- moviepy for video processing
+Every generated deck includes:
+- 36pt bold title slide with a themed accent bar
+- 28pt slide titles with a 2pt accent rule underneath
+- 18pt Calibri body text with proper bullet spacing
+- Slide numbers (`current / total`) in the bottom-right corner
+- Presentation title footer on all content slides
+
+### Developer Experience
+- Full hot-reload dev setup (Vite + uvicorn `--reload`)
+- Interactive API docs auto-generated at `http://localhost:8000/docs`
+- Transcript preview before committing to slide generation
+- Slide-content JSON preview in the UI after generation
+
+---
+
+## Architecture
+
+```
+voice-to-slide/
+├── backend/
+│   ├── main.py            # FastAPI app — upload, transcribe, generate, download
+│   ├── requirements.txt   # Python dependencies
+│   └── .env.example       # Environment variable template
+└── frontend/
+    ├── src/
+    │   ├── App.jsx        # Single-page React UI with theme picker
+    │   ├── main.jsx       # React entry point
+    │   └── index.css      # Tailwind base styles
+    ├── index.html
+    ├── package.json
+    ├── vite.config.js     # Dev server on :3000, hot reload
+    └── tailwind.config.js
+```
+
+**Backend** — FastAPI handles all heavy lifting: file I/O, Whisper inference, OpenAI API calls, and PowerPoint generation. In-memory job tracking keyed by UUID keeps the pipeline stateless per request.
+
+**Frontend** — A lightweight React SPA communicates with the backend over a local REST API. No build-time secrets; the API base URL is a plain constant pointing to `localhost:8000`.
+
+---
 
 ## Prerequisites
 
-- Node.js 18+ and npm
-- Python 3.8+
-- OpenAI API key
-- FFmpeg (for video processing)
+| Requirement | Version | Notes |
+|---|---|---|
+| Python | 3.8+ | |
+| Node.js | 18+ | |
+| FFmpeg | Any recent | Required by moviepy for audio extraction |
+| OpenAI API key | — | GPT slide generation only; Whisper runs locally |
+
+Install FFmpeg:
+```bash
+# macOS
+brew install ffmpeg
+
+# Ubuntu / Debian
+sudo apt install ffmpeg
+
+# Windows — download from https://ffmpeg.org/download.html
+```
+
+---
 
 ## Installation
 
-### 1. Clone and Setup
+### 1. Clone the repository
 
 ```bash
-cd project-4
+git clone https://github.com/your-username/voice-to-slide.git
+cd voice-to-slide
 ```
 
-### 2. Backend Setup
+### 2. Backend setup
 
 ```bash
 cd backend
 
-# Install Python dependencies
-pip3 install -r requirements.txt
+# Create and activate a virtual environment (recommended)
+python -m venv venv
+source venv/bin/activate      # Windows: venv\Scripts\activate
 
-# Create environment file
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment
 cp .env.example .env
-
-# Add your OpenAI API key to .env
-# Edit the .env file and replace 'your_openai_api_key_here' with your actual API key
-# IMPORTANT: Never commit the .env file with your real API key!
+# Open .env and add your OpenAI API key
 ```
 
-## ⚠️ Security Note
+Your `.env` should contain:
+```
+OPENAI_API_KEY=sk-...
+```
 
-- **Never commit your `.env` file** - it contains your API key
-- The `.gitignore` file is configured to prevent accidental commits of sensitive data
-- Keep your OpenAI API key secure and never share it publicly
-- The `.env.example` file is safe to commit as it doesn't contain real keys
-
-### 3. Frontend Setup
+### 3. Frontend setup
 
 ```bash
 cd frontend
-
-# Install dependencies
 npm install
 ```
 
+---
+
 ## Running the Application
 
-### Start Backend (Terminal 1)
+Open two terminal tabs from the project root.
 
+**Terminal 1 — Backend**
 ```bash
 cd backend
+source venv/bin/activate    # if using a venv
 uvicorn main:app --reload
 ```
+API running at `http://localhost:8000`
+Interactive docs at `http://localhost:8000/docs`
 
-Backend will run on `http://localhost:8000`
-
-### Start Frontend (Terminal 2)
-
+**Terminal 2 — Frontend**
 ```bash
 cd frontend
 npm run dev
 ```
+UI running at `http://localhost:3000`
 
-Frontend will run on `http://localhost:3000`
+---
 
 ## Usage
 
-1. **Upload Video**: Drag & drop an MP4 file or click to select
-2. **Process Audio**: Click "Process Audio" to extract and transcribe
-3. **Review Transcript**: Preview the generated transcript
-4. **Choose Theme**: Select from 4 professional color themes with visual previews
-5. **Generate Slides**: Click "Generate Slides" to create presentation with selected theme
-6. **Download**: Click "Download PowerPoint" to get your professionally designed .pptx file
+1. Open `http://localhost:3000`
+2. Drag and drop (or click to select) an `.mp4` file
+3. Click **Process Audio** — Whisper transcribes the video
+4. Review the transcript in the preview panel
+5. Choose a presentation theme from the visual picker
+6. Click **Generate Slides** — GPT structures the content
+7. Review the slide outline in the preview panel
+8. Click **Download PowerPoint** to save your `.pptx`
 
-## API Endpoints
+---
 
-- `POST /upload` - Upload MP4 file
-- `GET /status/{job_id}` - Check processing status
-- `GET /transcript/{job_id}` - Get transcript
-- `GET /themes` - Get available presentation themes
-- `POST /generate-slides/{job_id}?theme={theme_name}` - Generate slides with selected theme
-- `GET /download/{job_id}` - Download PowerPoint
+## API Reference
 
-## Professional Slide Design
+| Method | Endpoint | Description |
+|---|---|---|
+| `POST` | `/upload` | Upload an MP4 file; returns `job_id` |
+| `GET` | `/status/{job_id}` | Poll job status and progress percentage |
+| `GET` | `/transcript/{job_id}` | Trigger audio extraction + transcription; return text |
+| `GET` | `/themes` | List available themes with hex color values |
+| `POST` | `/generate-slides/{job_id}?theme=<theme>` | Generate and build the `.pptx` |
+| `GET` | `/download/{job_id}` | Download the finished `.pptx` file |
 
-### Available Themes
-
-1. **Corporate Blue** - Professional business presentations
-   - Primary: Deep blue (#197AD2)
-   - Background: Light blue (#F0F8FF)
-   - Accent: Teal (#009688)
-   - Use case: Business meetings, corporate reports
-
-2. **Modern Green** - Fresh, contemporary look
-   - Primary: Modern green (#4CAF50)
-   - Background: Light green (#F8FFF8)
-   - Accent: Orange (#FF9800)
-   - Use case: Tech presentations, startups, innovation
-
-3. **Elegant Purple** - Sophisticated and creative
-   - Primary: Elegant purple (#9C27B0)
-   - Background: Light purple (#FAF5FF)
-   - Accent: Gold (#FFC107)
-   - Use case: Creative presentations, design reviews
-
-4. **Professional Gray** - Clean, minimal aesthetic
-   - Primary: Blue-gray (#607D8B)
-   - Background: Light gray (#FAFAFA)
-   - Accent: Orange (#FF5722)
-   - Use case: Academic presentations, reports
-
-### Design Features
-
-- **Typography**: Professional Calibri font with proper hierarchy
-  - Title slides: 36pt bold titles
-  - Content slides: 28pt slide titles, 18pt content
-- **Slide Numbers**: Bottom-right corner with "current/total" format
-- **Footers**: Presentation title in bottom-left (except title slide)
-- **Decorative Elements**: 
-  - Accent lines under content slide titles
-  - Decorative accent bar on title slide
-- **Consistent Spacing**: Professional margins and bullet point spacing
-- **Theme Colors**: All elements styled with consistent theme colors
-
-### Theme Selection
-
-The frontend provides a visual theme picker where you can:
-- Preview color swatches for each theme
-- See primary, secondary, and accent colors
-- Click to select your preferred theme
-- Generate slides with your chosen design
-
-## File Structure
-
+Job status flow:
 ```
-project-4/
-├── backend/
-│   ├── main.py              # FastAPI application with theme system
-│   ├── requirements.txt     # Python dependencies
-│   ├── .env.example        # Environment template
-│   └── temp/               # Temporary file storage
-│       ├── uploads/        # Uploaded videos
-│       └── outputs/        # Generated presentations
-├── frontend/
-│   ├── src/
-│   │   ├── App.jsx         # Main React component with theme selection
-│   │   ├── main.jsx        # React entry point
-│   │   └── index.css       # Tailwind CSS
-│   ├── package.json        # Node dependencies
-│   ├── vite.config.js      # Vite configuration
-│   └── tailwind.config.js  # Tailwind configuration
-└── README.md               # This file
+uploaded → extracting_audio → transcribing → transcript_ready
+         → generating_slides → creating_powerpoint → completed
 ```
 
-## Development Notes
+---
 
-- **Local Only**: Designed for local development, no production deployment
-- **No Authentication**: Simple localhost-to-localhost communication
-- **File Cleanup**: Temporary files stored in `backend/temp/` directories
-- **Console Logging**: Debug output available in browser console and terminal
-- **CORS Enabled**: Configured for localhost:3000 ↔ localhost:8000
+## Tech Stack
+
+| Layer | Technology | Purpose |
+|---|---|---|
+| Frontend framework | React 18 + Vite | UI and dev server |
+| Styling | Tailwind CSS | Utility-first CSS |
+| File upload | react-dropzone | Drag-and-drop handling |
+| HTTP client | Axios | API communication |
+| API framework | FastAPI | REST endpoints, async I/O |
+| ASGI server | Uvicorn | Production-ready Python server |
+| Speech-to-text | OpenAI Whisper | Local audio transcription |
+| AI generation | OpenAI GPT-3.5-turbo | Slide content structuring |
+| Presentation | python-pptx | `.pptx` file creation |
+| Video processing | moviepy | Audio extraction from MP4 |
+| Environment | python-dotenv | Secret management |
+
+---
+
+## Security Notes
+
+- **Never commit your `.env` file.** It is excluded by `.gitignore`.
+- Use `.env.example` as the template — it contains no real secrets.
+- Whisper runs entirely locally; audio is never sent to an external service.
+- Only the transcript text is sent to the OpenAI API for slide generation.
+
+---
 
 ## Troubleshooting
 
-### Common Issues
-
-1. **FFmpeg not found**: Install FFmpeg for video processing
-2. **OpenAI API errors**: Check API key in `.env` file
-3. **File upload fails**: Ensure backend is running on port 8000
-4. **Whisper model loading**: First run downloads model automatically
-
-### Dependencies
-
-Make sure all required packages are installed:
-
-```bash
-# Backend
-pip3 install fastapi uvicorn python-multipart python-pptx moviepy openai openai-whisper python-dotenv
-
-# Frontend
-npm install react react-dom axios react-dropzone
-```
-
-## Local Development Focus
-
-This application is optimized for local development with:
-- Fast hot-reload with Vite
-- Simple file-based storage
-- Console debugging
-- No security overhead
-- Quick iteration cycles
-- Professional presentation output
-- Theme system for design customization
-
-Perfect for testing, prototyping, and local content creation workflows that require professional-quality presentations.
-
-## Output Quality
-
-The generated PowerPoint presentations feature:
-- **Professional Design**: Business-ready slides with consistent styling
-- **Multiple Themes**: Choose from 4 carefully crafted color schemes
-- **Typography**: Proper font hierarchy and spacing
-- **Visual Polish**: Slide numbers, footers, and decorative elements
-- **Consistent Branding**: Theme-based colors throughout all slides
-
-Transform your audio content into presentation-ready slides that look professionally designed!
+| Issue | Fix |
+|---|---|
+| `FFmpeg not found` | Install FFmpeg and ensure it is on your `PATH` |
+| `OpenAI API error` | Verify `OPENAI_API_KEY` in `backend/.env` |
+| Upload fails immediately | Confirm the backend is running on port 8000 |
+| Whisper model slow on first run | The base model (~145 MB) downloads automatically on first use |
+| `CORS error` in browser | Backend must be on `localhost:8000`; frontend on `localhost:3000` |
