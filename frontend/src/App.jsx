@@ -1,143 +1,93 @@
-import { useState, useCallback, useEffect } from 'react'
-import { useDropzone } from 'react-dropzone'
+import { useEffect, useState } from 'react'
 import axios from 'axios'
+import { Download, Loader2, Sparkles, UploadCloud } from 'lucide-react'
+import { Button } from './components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card'
+import { Input } from './components/ui/input'
+import { Label } from './components/ui/label'
+import { Select } from './components/ui/select'
+import { Switch } from './components/ui/switch'
+import { Textarea } from './components/ui/textarea'
 
-const API_BASE_URL = 'http://localhost:8000'
+const API_CANDIDATES = [
+  import.meta.env.VITE_API_BASE_URL,
+  'http://localhost:8000',
+  'http://127.0.0.1:8000',
+  'http://localhost:8001',
+  'http://127.0.0.1:8001',
+].filter(Boolean)
+const VISUAL_STYLES = ['cinematic', 'minimalist', 'futuristic', 'editorial', 'photoreal']
 
 function App() {
-  const [jobId, setJobId] = useState(null)
-  const [status, setStatus] = useState('idle')
-  const [progress, setProgress] = useState(0)
-  const [transcript, setTranscript] = useState('')
-  const [slideContent, setSlideContent] = useState(null)
-  const [error, setError] = useState('')
-  const [uploading, setUploading] = useState(false)
+  const [apiBaseUrl, setApiBaseUrl] = useState(API_CANDIDATES[0] || '')
   const [themes, setThemes] = useState({})
   const [selectedTheme, setSelectedTheme] = useState('corporate_blue')
+  const [visualStyle, setVisualStyle] = useState('cinematic')
+  const [includeImages, setIncludeImages] = useState(true)
+  const [textInput, setTextInput] = useState('')
+  const [audioFile, setAudioFile] = useState(null)
+  const [transcript, setTranscript] = useState('')
+  const [slideContent, setSlideContent] = useState(null)
+  const [jobId, setJobId] = useState('')
+  const [isGenerating, setIsGenerating] = useState(false)
+  const [error, setError] = useState('')
 
-  // Load themes on component mount
   useEffect(() => {
     const loadThemes = async () => {
-      try {
-        const response = await axios.get(`${API_BASE_URL}/themes`)
-        setThemes(response.data.themes)
-      } catch (err) {
-        console.error('Failed to load themes:', err)
+      for (const baseUrl of API_CANDIDATES) {
+        try {
+          const response = await axios.get(`${baseUrl}/themes`, { timeout: 2500 })
+          setThemes(response.data.themes || {})
+          setApiBaseUrl(baseUrl)
+          setError('')
+          return
+        } catch (err) {
+          // Try next candidate URL
+        }
       }
+      setError(`Failed to load themes. Start backend and check API URL (tried: ${API_CANDIDATES.join(', ')})`)
     }
     loadThemes()
   }, [])
 
-  const onDrop = useCallback(async (acceptedFiles) => {
-    const file = acceptedFiles[0]
-    if (!file) return
-
-    if (!file.name.endsWith('.mp4')) {
-      setError('Please upload an MP4 file')
+  const handleGenerate = async () => {
+    if (!textInput.trim() && !audioFile) {
+      setError('Add text or upload an audio file')
       return
     }
 
-    setUploading(true)
     setError('')
-    setJobId(null)
-    setStatus('uploading')
-    setProgress(0)
+    setIsGenerating(true)
+    setSlideContent(null)
+    setTranscript('')
+    setJobId('')
 
     try {
       const formData = new FormData()
-      formData.append('file', file)
+      formData.append('transcript', textInput)
+      formData.append('theme', selectedTheme)
+      formData.append('include_images', String(includeImages))
+      formData.append('visual_style', visualStyle)
+      if (audioFile) formData.append('audio', audioFile)
 
-      const response = await axios.post(`${API_BASE_URL}/upload`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data',
-        },
+      const response = await axios.post(`${apiBaseUrl}/generate-from-input`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' },
       })
 
-      setJobId(response.data.job_id)
-      setStatus('uploaded')
-      setProgress(10)
-      console.log('File uploaded successfully:', response.data)
-    } catch (err) {
-      setError('Failed to upload file: ' + err.message)
-      console.error('Upload error:', err)
-    } finally {
-      setUploading(false)
-    }
-  }, [])
-
-  const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    onDrop,
-    accept: {
-      'video/mp4': ['.mp4']
-    },
-    multiple: false
-  })
-
-  const pollStatus = async () => {
-    if (!jobId) return
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/status/${jobId}`)
-      const jobStatus = response.data
-      
-      setStatus(jobStatus.status)
-      setProgress(jobStatus.progress || 0)
-      
-      if (jobStatus.status === 'error') {
-        setError(jobStatus.error)
-      }
-      
-      console.log('Job status:', jobStatus)
-    } catch (err) {
-      setError('Failed to check status: ' + err.message)
-      console.error('Status error:', err)
-    }
-  }
-
-  const getTranscript = async () => {
-    if (!jobId) return
-
-    try {
-      const response = await axios.get(`${API_BASE_URL}/transcript/${jobId}`)
-      
-      if (response.data.transcript) {
-        setTranscript(response.data.transcript)
-        setStatus('transcript_ready')
-        setProgress(60)
-      }
-      
-      console.log('Transcript:', response.data)
-    } catch (err) {
-      setError('Failed to get transcript: ' + err.message)
-      console.error('Transcript error:', err)
-    }
-  }
-
-  const generateSlides = async () => {
-    if (!jobId) return
-
-    try {
-      const response = await axios.post(`${API_BASE_URL}/generate-slides/${jobId}?theme=${selectedTheme}`)
-      
       setSlideContent(response.data.slide_content)
-      setStatus('completed')
-      setProgress(100)
-      
-      console.log('Slides generated:', response.data)
+      setTranscript(response.data.transcript || '')
+      setJobId(response.data.job_id || '')
     } catch (err) {
-      setError('Failed to generate slides: ' + err.message)
-      console.error('Slides error:', err)
+      setError(err.response?.data?.detail || `Generation failed: ${err.message}`)
+    } finally {
+      setIsGenerating(false)
     }
   }
 
-  const downloadPresentation = async () => {
+  const handleDownload = async () => {
     if (!jobId) return
-
     try {
-      const response = await axios.get(`${API_BASE_URL}/download/${jobId}`, {
-        responseType: 'blob',
-      })
-
+      const response = await axios.get(`${apiBaseUrl}/download/${jobId}`, { responseType: 'blob' })
       const url = window.URL.createObjectURL(new Blob([response.data]))
       const link = document.createElement('a')
       link.href = url
@@ -146,221 +96,151 @@ function App() {
       link.click()
       link.remove()
       window.URL.revokeObjectURL(url)
-      
-      console.log('Download initiated')
     } catch (err) {
-      setError('Failed to download presentation: ' + err.message)
-      console.error('Download error:', err)
+      setError('Download failed')
     }
   }
 
-  const resetApp = () => {
-    setJobId(null)
-    setStatus('idle')
-    setProgress(0)
-    setTranscript('')
-    setSlideContent(null)
-    setError('')
-    setUploading(false)
-  }
-
   return (
-    <div className="min-h-screen bg-gray-100 py-12 px-4 sm:px-6 lg:px-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="text-center mb-8">
-          <h1 className="text-4xl font-bold text-gray-900 mb-2">
-            Voice-to-Slide Generator
-          </h1>
-          <p className="text-lg text-gray-600">
-            Upload an MP4 video to generate PowerPoint slides from audio
-          </p>
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <div className="flex">
-              <div className="text-red-700">{error}</div>
-              <button
-                onClick={() => setError('')}
-                className="ml-auto text-red-500 hover:text-red-700"
-              >
-                ✕
-              </button>
+    <main className="min-h-screen bg-slate-950 px-4 py-6 text-slate-100 md:px-8">
+      <div className="mx-auto grid w-full max-w-7xl grid-cols-1 gap-6 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>AI Slide Builder</CardTitle>
+            <CardDescription>Paste text or upload audio, then generate slides instantly.</CardDescription>
+            <p className="text-xs text-slate-500">API: {apiBaseUrl || 'not connected'}</p>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <div>
+              <Label className="mb-2 block">Text Input</Label>
+              <Textarea
+                value={textInput}
+                onChange={(e) => setTextInput(e.target.value)}
+                placeholder="Paste your script, meeting notes, or outline..."
+                className="min-h-[160px]"
+              />
             </div>
-          </div>
-        )}
 
-        {/* Upload Area */}
-        {status === 'idle' && (
-          <div className="mb-8">
-            <div
-              {...getRootProps()}
-              className={`border-2 border-dashed rounded-lg p-12 text-center cursor-pointer transition-colors ${
-                isDragActive
-                  ? 'border-blue-400 bg-blue-50'
-                  : 'border-gray-300 hover:border-gray-400'
-              }`}
-            >
-              <input {...getInputProps()} />
-              <div className="text-gray-500 text-lg">
-                {isDragActive ? (
-                  <p>Drop the MP4 file here...</p>
-                ) : (
-                  <div>
-                    <p className="mb-2">Drag & drop an MP4 file here</p>
-                    <p className="text-sm">or click to select</p>
-                  </div>
-                )}
-              </div>
+            <div>
+              <Label className="mb-2 block">Audio Upload</Label>
+              <label className="flex h-10 cursor-pointer items-center gap-3 rounded-xl border border-dashed border-slate-700 bg-slate-950 px-3 text-sm text-slate-300 hover:border-cyan-400/70">
+                <UploadCloud className="h-4 w-4" />
+                <span>{audioFile ? audioFile.name : 'Choose audio file (mp3, wav, m4a, etc.)'}</span>
+                <Input
+                  type="file"
+                  accept="audio/*,.m4a,.wav,.mp3,.ogg,.flac,.aac"
+                  className="hidden"
+                  onChange={(e) => setAudioFile(e.target.files?.[0] || null)}
+                />
+              </label>
             </div>
-          </div>
-        )}
 
-        {/* Progress Bar */}
-        {(status !== 'idle' && status !== 'completed') && (
-          <div className="mb-8">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Progress</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
-              <div
-                className="bg-blue-500 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${progress}%` }}
-              ></div>
-            </div>
-            <p className="text-sm text-gray-600 mt-2 capitalize">
-              {status.replace(/_/g, ' ')}
-              {uploading && '...'}
-            </p>
-          </div>
-        )}
-
-        {/* Theme Selection */}
-        {status === 'transcript_ready' && Object.keys(themes).length > 0 && (
-          <div className="mb-8 p-6 bg-white rounded-lg shadow">
-            <h3 className="text-lg font-semibold mb-4">Choose Presentation Theme</h3>
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {Object.entries(themes).map(([themeId, theme]) => (
-                <div
-                  key={themeId}
-                  onClick={() => setSelectedTheme(themeId)}
-                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all hover:shadow-md ${
-                    selectedTheme === themeId 
-                      ? 'border-blue-500 bg-blue-50' 
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <div>
+                <Label className="mb-2 block">Theme</Label>
+                <Select
+                  value={selectedTheme}
+                  onChange={(e) => setSelectedTheme(e.target.value)}
                 >
-                  <div className="mb-2">
-                    <div className="flex space-x-1 mb-1">
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: theme.colors.primary }}
-                      ></div>
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: theme.colors.secondary }}
-                      ></div>
-                      <div 
-                        className="w-4 h-4 rounded-full" 
-                        style={{ backgroundColor: theme.colors.accent }}
-                      ></div>
-                    </div>
-                    <div 
-                      className="w-full h-2 rounded" 
-                      style={{ backgroundColor: theme.colors.background }}
-                    ></div>
-                  </div>
-                  <p className="text-sm font-medium text-gray-700">{theme.name}</p>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Action Buttons */}
-        <div className="flex gap-4 mb-8 justify-center">
-          {jobId && status === 'uploaded' && (
-            <button
-              onClick={getTranscript}
-              disabled={uploading}
-              className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
-            >
-              Process Audio
-            </button>
-          )}
-
-          {status === 'transcript_ready' && (
-            <button
-              onClick={generateSlides}
-              className="px-6 py-3 bg-green-500 text-white rounded-lg hover:bg-green-600"
-            >
-              Generate Slides
-            </button>
-          )}
-
-          {status === 'completed' && (
-            <button
-              onClick={downloadPresentation}
-              className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600"
-            >
-              Download PowerPoint
-            </button>
-          )}
-
-          {(status === 'uploaded' || status === 'transcript_ready' || status === 'completed') && (
-            <button
-              onClick={pollStatus}
-              className="px-6 py-3 bg-gray-500 text-white rounded-lg hover:bg-gray-600"
-            >
-              Refresh Status
-            </button>
-          )}
-
-          {status !== 'idle' && (
-            <button
-              onClick={resetApp}
-              className="px-6 py-3 bg-red-500 text-white rounded-lg hover:bg-red-600"
-            >
-              Start Over
-            </button>
-          )}
-        </div>
-
-        {/* Transcript Display */}
-        {transcript && (
-          <div className="mb-8 p-6 bg-white rounded-lg shadow">
-            <h3 className="text-lg font-semibold mb-4">Transcript</h3>
-            <div className="text-gray-700 whitespace-pre-wrap max-h-64 overflow-y-auto">
-              {transcript}
-            </div>
-          </div>
-        )}
-
-        {/* Slide Content Preview */}
-        {slideContent && (
-          <div className="mb-8 p-6 bg-white rounded-lg shadow">
-            <h3 className="text-lg font-semibold mb-4">Generated Slides</h3>
-            <div className="space-y-4">
-              <div className="p-4 bg-gray-50 rounded">
-                <h4 className="font-semibold text-lg">{slideContent.title}</h4>
+                  {Object.entries(themes).map(([id, theme]) => (
+                    <option key={id} value={id}>
+                      {theme.name}
+                    </option>
+                  ))}
+                </Select>
               </div>
-              {slideContent.slides.map((slide, index) => (
-                <div key={index} className="p-4 bg-gray-50 rounded">
-                  <h4 className="font-semibold mb-2">{slide.title}</h4>
-                  <ul className="list-disc list-inside space-y-1">
-                    {slide.content.map((point, pointIndex) => (
-                      <li key={pointIndex} className="text-gray-700">{point}</li>
+              <div>
+                <Label className="mb-2 block">Visual Style</Label>
+                <Select
+                  value={visualStyle}
+                  onChange={(e) => setVisualStyle(e.target.value)}
+                >
+                  {VISUAL_STYLES.map((style) => (
+                    <option key={style} value={style}>
+                      {style}
+                    </option>
+                  ))}
+                </Select>
+              </div>
+            </div>
+
+            <label className="flex items-center justify-between rounded-xl border border-slate-700 bg-slate-950 px-4 py-3 text-sm">
+              <span>Generate AI images per slide</span>
+              <Switch checked={includeImages} onClick={() => setIncludeImages((prev) => !prev)} />
+            </label>
+
+            {error && <p className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-200">{error}</p>}
+
+            <div className="flex flex-wrap gap-3">
+              <Button
+                onClick={handleGenerate}
+                disabled={isGenerating}
+              >
+                {isGenerating ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />}
+                {isGenerating ? 'Generating...' : 'Generate Slides'}
+              </Button>
+
+              <Button
+                onClick={handleDownload}
+                disabled={!jobId}
+                variant="secondary"
+              >
+                <Download className="h-4 w-4" />
+                Download PPTX
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Preview</CardTitle>
+            <CardDescription>Generated slides appear here on the right.</CardDescription>
+          </CardHeader>
+          <CardContent>
+
+          {!slideContent && (
+            <div className="rounded-xl border border-dashed border-slate-700 bg-slate-950/60 p-8 text-sm text-slate-500">
+              No slides yet. Enter text or upload audio, then click Generate Slides.
+            </div>
+          )}
+
+          {slideContent && (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-cyan-500/30 bg-cyan-500/10 p-4">
+                <p className="text-xs uppercase tracking-wide text-cyan-200">Presentation Title</p>
+                <h3 className="text-lg font-semibold text-cyan-50">{slideContent.title}</h3>
+              </div>
+
+              {slideContent.slides?.map((slide, index) => (
+                <article key={index} className="rounded-xl border border-slate-700 bg-slate-950 p-4">
+                  <p className="mb-2 text-xs uppercase tracking-wide text-slate-500">Slide {index + 1}</p>
+                  <h4 className="mb-2 text-base font-semibold">{slide.title}</h4>
+                  <ul className="space-y-1 text-sm text-slate-300">
+                    {slide.content?.map((point, pointIndex) => (
+                      <li key={pointIndex}>- {point}</li>
                     ))}
                   </ul>
-                </div>
+                  {slide.visual_prompt && (
+                    <p className="mt-3 rounded-md border border-slate-700 bg-slate-900 p-2 text-xs text-slate-400">
+                      Visual prompt: {slide.visual_prompt}
+                    </p>
+                  )}
+                </article>
               ))}
+
+              {transcript && (
+                <div className="max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 p-4 text-xs text-slate-400">
+                  <p className="mb-2 font-medium text-slate-300">Transcript used</p>
+                  <p className="whitespace-pre-wrap">{transcript}</p>
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )}
+          </CardContent>
+        </Card>
       </div>
-    </div>
+    </main>
   )
 }
 
